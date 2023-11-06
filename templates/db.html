@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>db</title>
+
+</head>
+<body>
+
+    <h1>Base de datos</h1>
+    <!-- <h1>base de datos</h1>
+    <table>
+        <tr>
+            <th>Json</th>            
+        </tr>
+        <tr>
+            {% for datJsons in dataJson %}
+            <td>
+                <p> {{ datJsons.data }}</p>
+            </td>
+            {% endfor %}
+        </tr>
+    </table> -->
+
+    <h3>{{ data_con_registro.page }} - {{ data_con_registro.pages }}</h3><!--se muestra el num de la pagina donde se encuentra uno -->
+
+    {% for Json , Autor in data_con_registro %}
+    <p> {{ Json.data }}</p>
+    <p> Creado por: {{ Autor.creado_por}}</p>
+    <p> Fecha de creacion: {{Autor.fecha_creacion_}}</p>
+    <p>
+        {% if Autor.modificado_por %}
+            Modificado por:{{ Autor.modificado_por}}
+            <br>
+            Fecha de modificacion: {{ Autor.fecha_modificacion }}
+        {% endif %}
+    </p>
+    <p>Vigencia: {{Autor.vigente}}</p>
+    
+    <form action="/data/{{Autor.json_id}}" method="POST">
+        <button type="submit" name="button" id="button" >Update</button>
+    </form>
+
+    <form action="/data/{{Json.id}}/delete" method="POST">
+        <button type="submit" name="button" id="buttonDelete" >Delete</button>
+    </form>
+    ------------------------------------------
+    {% endfor %}
+
+    <!-- si el registro cuenta con datos anteriores -->
+    <div class="pagination">
+        {% if data_con_registro.has_prev %}
+        <span>
+            <a class="page-number" href="{{ url_for ('index', page=data_con_registro.prev_num, per_page = per_page)}}">
+                {{ '<<<'}}
+            </a>
+        </span>
+        {% endif %}
+
+        <!-- iteracion del numero total de paginas -->
+        {% for numero in data_con_registro.iter_pages() %}
+            {% if data_con_registro.page != numero %}
+            <span>
+                <a class="page-numero" chref="{{ url_for('index' , page=numero )}}">
+                    {{ numero }}
+                </a>
+            </span>
+            {% else %}
+                <span class="current-page-numero">{{ numero }}</span>
+            {% endif %}
+        {% endfor %}
+
+        <!-- si el registro cuenta con proximos datos -->
+        {% if data_con_registro.has_next %}
+            <span>
+                <a class="page-numero" href="{{ url_for('index', page= data_con_registro.next_num, per_page = per_page)}}">
+                    {{ '>>>' }}
+                </a>
+            </span>
+        {% endif%} 
+
+    </div>
+    
+    <form method="GET">
+        <!-- <form action="{{ url_for('index' , page = 1, per_page = 4)}}" method="POST"> -->
+        <label for="per_page">Numero de filas</label>
+        <select name="per_page" id="per_page">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+        </select>
+        <input type="submit">
+        <!-- <a href="{{ url_for('index', page= 1, per_page = per_page )}}">listo</a> -->
+    </form>
+
+</body>
+</html>
