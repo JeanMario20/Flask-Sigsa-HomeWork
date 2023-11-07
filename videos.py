@@ -2,10 +2,12 @@ from flask import Flask, render_template, request, jsonify, redirect
 from flask_sqlalchemy import SQLAlchemy
 import threading
 from sqlalchemy.dialects.postgresql import JSON
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import func
+from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy import func, create_engine
 from datetime import datetime
 from crontab import CronTab
+from apscheduler.schedulers.background import BackgroundScheduler
+from flask_apscheduler import APScheduler
 import schedule
 import time
 import json
@@ -14,11 +16,10 @@ import json
 #from MisModels import db, control, Json
 
 app = Flask(__name__)
-#cron = CronTab(user = "Jean hernandez flores")
-#cron = CronTab(app)
 
 #configurar la base de datos SQlite
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://postgres:1234@localhost/flask"
+engine = create_engine("postgresql://postgres:1234@localhost/flask")
 #inicializar la extension con la app
 db = SQLAlchemy(app)
 
@@ -215,57 +216,97 @@ def registrar_hora(url):
         print(url, ' a las ', hora_cadena)
 
 #!Schedule------------------------------------------------------------
-# Agrega una tarea cron que se ejecuta cada minuto
-#job = cron.new(command='python /documents/programacion/Flask/api/backup.py')
-#job.setall('* * * * *')
-
-# Escribe los cambios en el archivo crontab
-#cron.write()
 
 
-def addBackup():
-        with app.app_context():
-            rows = db.session.query(Json).join(Autor).with_entities(Json.id).all()
-            for row in rows:
-                ids = int(row.id)
-                data = db.session.query(Json).join(Autor).filter(Json.id == ids).with_entities(Json.data).first() # el dato que nos devuelve es de tipo <class 'sqlalchemy.engine.row.Row'> hay que transformalo a json
+
+#def addBackup():
+#        with app.app_context():
+#            rows = db.session.query(Json).join(Autor).with_entities(Json.id).all()
+#            for row in rows:
+#                ids = int(row.id)
+#                data = db.session.query(Json).join(Autor).filter(Json.id == ids).with_entities(Json.data).first() # el dato que nos devuelve es de tipo <class 'sqlalchemy.engine.row.Row'> hay que transformalo a json
                 
-                data_list = list(data)
-                data_json = json.dumps(data_list)
-                data_json_fixed = json.loads(data_json)
+#                data_list = list(data)
+#                data_json = json.dumps(data_list)
+#                data_json_fixed = json.loads(data_json)
 
-                backup_guardar = Backup(data = data_json_fixed, status = "se a creado la copia",Fecha_registro = datetime.now())
-                db.session.add(backup_guardar)
-                db.session.commit()
-            print("la copia a sido generada")
+#                backup_guardar = Backup(data = data_json_fixed, status = "se a creado la copia",Fecha_registro = datetime.now())
+#                db.session.add(backup_guardar)
+#                db.session.commit()
+#            print("la copia a sido generada")
+
+#def updateBackup():
+#    with app.app_context():
+#        rows = db.session.query(Backup).all()
+#        for row in rows:
+            
+#            row.status = "Copia actualizada"
+#            db.session.commit()
+#        print("las copias fueron actualizados")
+
+#def deleteBackup():
+#    with app.app_context():
+#        rows = db.session.query(Backup).all()
+#        for row in rows:
+#            if row.status == 'Copia actualizada':
+#                db.session.delete(row)
+#                db.session.commit()
+#        print("las copias han sido borradas")
+
+
+#schedule.every(5).seconds.do(addBackup)
+#schedule.every(10).seconds.do(updateBackup)
+#schedule.every(15).seconds.do(deleteBackup)   
+
+#while True:
+#    schedule.run_pending()
+#    time.sleep(1)
+
+#utilizar ASPscheduler ----------------------------------------------------
+sched = BackgroundScheduler()
+session_maker = sessionmaker(autocommit = False, autoflush=False, bind= engine)
+Session = scoped_session(session_maker)
+
+def mi_tarea():
+    print("esta es una tarea" )
+
+def addbackupASP():
+    se = Session()
+    rows = se.query(Json).all()
+    for row in rows:
+        ids = int(row.id)
+        data = se.query(Json).join(Autor).filter(Json.id == ids).with_entities(Json.data).first()
+        data_list = list(data)
+        data_json = json.dumps(data_list)
+        data_json_fixed = json.loads(data_json)
+
+        backup_guardar = Backup(data = data_json_fixed, status = "se a creado la copia",Fecha_registro = datetime.now())
+        Session.add(backup_guardar)
+        Session.commit()
+    print("la copia a sido generada")
 
 def updateBackup():
-    with app.app_context():
-        rows = db.session.query(Backup).all()
-        for row in rows:
-            #update = Backup.query.filter(Backup.id == ids).with_entities(Backup.status).first()
-            row.status = "Copia actualizada"
-            db.session.commit()
-        print("las copias fueron actualizados")
+    se = Session()
+    rows = se.query(Backup).all()
+    for row in rows:
+        row.status = "Copia actualizada"
+        Session.commit()
+    print("las copias fueron actualizadas")
 
 def deleteBackup():
-    with app.app_context():
-        rows = db.session.query(Backup).all()
-        for row in rows:
-            if row.status == 'Copia actualizada':
-                db.session.delete(row)
-                db.session.commit()
-        print("las copias han sido borradas")
-
-
-schedule.every(5).seconds.do(addBackup)
-schedule.every(10).seconds.do(updateBackup)
-schedule.every(15).seconds.do(deleteBackup)
+    se = Session()
+    rows = se.query(Backup).all()
+    for row in rows:
+        if row.status == "Copia actualizada":
+            Session.delete(row)
+            Session.commit()
+    print("las copias han sido borradas")
     
+sched.add_job(addbackupASP , 'interval', seconds = 2)
+sched.add_job(updateBackup , 'interval', seconds = 2)
+sched.add_job(deleteBackup , 'interval', seconds = 2)
 
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+sched.start()
 
 if __name__ == "__main__":
     app.run()
